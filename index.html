@@ -375,7 +375,6 @@ select:focus,input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(236,
   </section>
   <section class="auth-card">
     <h1>Iniciar sesión</h1>
-    <p>Entra con tu usuario de Supabase para que el historial y el intento guardado se sincronicen online.</p>
     <div class="auth-form">
       <div>
         <label>Email</label>
@@ -387,7 +386,7 @@ select:focus,input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(236,
       </div>
       <button class="btn btn-primary" id="loginBtn" type="button">Entrar</button>
     </div>
-    <div id="authMessage" class="auth-message">Configura primero tus claves de Supabase dentro del HTML: <b>SUPABASE_URL</b> y <b>SUPABASE_ANON_KEY</b>.</div>
+    <div id="authMessage" class="auth-message"></div>
   </section>
 </div>
 <div id="startScreen" class="app start-clean hidden">
@@ -539,7 +538,7 @@ async function saveCloudProgress(){if(!currentUser||!supabaseClient)return;try{s
 async function loadCloudProgress(){if(!currentUser||!supabaseClient)return;const {data,error}=await supabaseClient.from(SUPABASE_TABLE).select('history,saved_state,updated_at').eq('user_id',currentUser.id).maybeSingle();if(error){console.error(error);throw error}if(!data){cloudProgress={history:[],saved_state:null,updated_at:null};await saveCloudProgress();return}cloudProgress={history:Array.isArray(data.history)?data.history:[],saved_state:data.saved_state||null,updated_at:data.updated_at||null};localStorage.setItem(scopedStorageKey(STORAGE_HISTORY),JSON.stringify(cloudProgress.history));if(cloudProgress.saved_state)localStorage.setItem(scopedStorageKey(STORAGE_STATE),JSON.stringify(cloudProgress.saved_state));else localStorage.removeItem(scopedStorageKey(STORAGE_STATE))}
 function showLogin(){clearInterval(timerInterval);state=null;$('authScreen').classList.remove('hidden');$('startScreen').classList.add('hidden');$('quizScreen').classList.add('hidden');$('resultScreen').classList.add('hidden')}
 function showApp(){if($('userEmailLabel'))$('userEmailLabel').textContent=currentUser?.email||'Sesión iniciada';$('authScreen').classList.add('hidden');$('startScreen').classList.remove('hidden');$('quizScreen').classList.add('hidden');$('resultScreen').classList.add('hidden');fillSelect();updateStartStats();setSyncStatus('ok')}
-async function initAuth(){if(!supabaseConfigured()||!window.supabase){showLogin();setAuthMessage('Antes de entrar, pega tus claves en el HTML: <b>SUPABASE_URL</b> y <b>SUPABASE_ANON_KEY</b>. Después crea la tabla con el SQL que te paso.', 'error');return}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const {data,error}=await supabaseClient.auth.getSession();if(error)console.error(error);if(data&&data.session&&data.session.user){currentUser=data.session.user;try{await loadCloudProgress();showApp();toast('Progreso sincronizado.')}catch(e){showLogin();setAuthMessage('No se pudo cargar tu progreso. Revisa que la tabla y las políticas RLS estén creadas.', 'error')}}else{showLogin();setAuthMessage('Introduce tu email y contraseña de Supabase. Si aún no tienes usuario, créalo desde Supabase > Authentication > Users.', '')}}
+async function initAuth(){if(!supabaseConfigured()||!window.supabase){showLogin();setAuthMessage('Antes de entrar, pega tus claves en el HTML: <b>SUPABASE_URL</b> y <b>SUPABASE_ANON_KEY</b>. Después crea la tabla con el SQL que te paso.', 'error');return}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const {data,error}=await supabaseClient.auth.getSession();if(error)console.error(error);if(data&&data.session&&data.session.user){currentUser=data.session.user;try{await loadCloudProgress();showApp();toast('Progreso sincronizado.')}catch(e){showLogin();setAuthMessage('No se pudo cargar tu progreso. Revisa que la tabla y las políticas RLS estén creadas.', 'error')}}else{showLogin();setAuthMessage('', '')}}
 async function loginWithSupabase(){if(!supabaseClient){setAuthMessage('Primero configura SUPABASE_URL y SUPABASE_ANON_KEY en el HTML.', 'error');return}const email=($('loginEmail').value||'').trim();const password=$('loginPassword').value||'';if(!email||!password){setAuthMessage('Rellena email y contraseña.', 'error');return}const btn=$('loginBtn');btn.disabled=true;btn.textContent='Entrando...';try{const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});if(error)throw error;currentUser=data.user;await loadCloudProgress();showApp();toast('Sesión iniciada y progreso sincronizado.')}catch(e){console.error(e);setAuthMessage('Usuario o contraseña incorrectos, o Supabase no está bien configurado.', 'error')}finally{btn.disabled=false;btn.textContent='Entrar'}}
 async function logoutSupabase(){await flushCloudSave();if(supabaseClient)await supabaseClient.auth.signOut();currentUser=null;cloudProgress={history:[],saved_state:null,updated_at:null};showLogin();setAuthMessage('Sesión cerrada.', 'ok')}
 function getSection(){return $('sectionSelect')?$('sectionSelect').value:'general'}
