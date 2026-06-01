@@ -300,6 +300,70 @@ select:focus,input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(236,
 .user-cloud-box button:hover{background:linear-gradient(135deg,var(--pink),var(--pink2));color:#fff;border-color:transparent}
 @media(max-width:760px){.user-cloud-box{position:relative;top:auto;left:auto;margin-bottom:8px;max-width:100%;justify-content:center}.user-cloud-box span{max-width:210px}.auth-card{margin:18px auto;padding:22px;border-radius:28px}}
 
+
+
+/* Ajuste sesión: controles compactos arriba a la derecha */
+.top-actions{
+  position:absolute;
+  top:28px;
+  right:24px;
+  z-index:30;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.top-actions .top-json{
+  position:relative!important;
+  top:auto!important;
+  right:auto!important;
+  z-index:auto!important;
+  width:auto!important;
+}
+.top-actions .top-json .json-menu{
+  left:auto;
+  right:0;
+}
+.top-actions .user-cloud-box{
+  position:relative!important;
+  top:auto!important;
+  left:auto!important;
+  z-index:auto!important;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+  max-width:none;
+  padding:7px 8px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 10px 24px rgba(190,24,93,.10);
+}
+.top-actions .user-cloud-box span{display:none!important}
+.top-actions .user-cloud-box .sync-dot{
+  width:9px;
+  height:9px;
+}
+.top-actions .user-cloud-box button{
+  padding:7px 11px;
+  line-height:1;
+  font-size:13px;
+}
+@media(max-width:760px){
+  .top-actions{
+    position:relative;
+    top:auto;
+    right:auto;
+    justify-content:flex-end;
+    margin-bottom:8px;
+  }
+  .top-actions .top-json .json-menu{
+    right:0;
+    left:auto;
+    min-width:220px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -327,16 +391,17 @@ select:focus,input:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(236,
   </section>
 </div>
 <div id="startScreen" class="app start-clean hidden">
-  <div class="user-cloud-box">
-    <i id="syncDot" class="sync-dot" aria-hidden="true"></i>
-    <span id="userEmailLabel">Sin sesión</span>
-    <button id="logoutBtn" type="button">Salir</button>
-  </div>
-  <div class="json-menu-wrap top-json">
-    <button class="btn btn-secondary" id="jsonMenuBtn" type="button">JSON</button>
-    <div id="jsonMenu" class="json-menu hidden">
-      <button class="btn btn-ghost" id="exportProgressBtn" type="button">Exportar</button>
-      <button class="btn btn-ghost" id="importProgressBtn" type="button">Importar</button>
+  <div class="top-actions">
+    <div class="json-menu-wrap top-json">
+      <button class="btn btn-secondary" id="jsonMenuBtn" type="button">JSON</button>
+      <div id="jsonMenu" class="json-menu hidden">
+        <button class="btn btn-ghost" id="exportProgressBtn" type="button">Exportar</button>
+        <button class="btn btn-ghost" id="importProgressBtn" type="button">Importar</button>
+      </div>
+    </div>
+    <div class="user-cloud-box" title="Sesión iniciada. El punto indica el estado de sincronización.">
+      <i id="syncDot" class="sync-dot" aria-hidden="true"></i>
+      <button id="logoutBtn" type="button">Salir</button>
     </div>
   </div>
   <section class="minimal-hero">
@@ -448,34 +513,48 @@ function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Mat
 function supabaseConfigured(){return /^https:\/\/.+\.supabase\.co$/i.test(SUPABASE_URL)&&SUPABASE_ANON_KEY&&SUPABASE_ANON_KEY!=='PEGA_AQUI_TU_SUPABASE_ANON_KEY'}
 function setAuthMessage(msg,type=''){const el=$('authMessage');if(!el)return;el.innerHTML=msg;el.className='auth-message '+type}
 function setSyncStatus(status){const dot=$('syncDot');if(!dot)return;dot.className='sync-dot';if(status==='saving')dot.classList.add('saving');if(status==='error')dot.classList.add('error')}
-function localHistory(){try{return JSON.parse(localStorage.getItem(STORAGE_HISTORY)||'[]')}catch(e){return []}}
-function localSavedState(){try{return JSON.parse(localStorage.getItem(STORAGE_STATE)||'null')}catch(e){return null}}
-function historyAll(){return currentUser?Array.isArray(cloudProgress.history)?cloudProgress.history:[]:localHistory()}
-function saveHistory(list){const clean=Array.isArray(list)?list:[];localStorage.setItem(STORAGE_HISTORY,JSON.stringify(clean));if(currentUser){cloudProgress.history=clean;queueCloudSave()}}
-function getSavedState(){return currentUser?(cloudProgress.saved_state||localSavedState()):localSavedState()}
-function persistSavedState(obj){if(obj)localStorage.setItem(STORAGE_STATE,JSON.stringify(obj));if(currentUser){cloudProgress.saved_state=obj||null;queueCloudSave()}}
-function clearSavedState(){localStorage.removeItem(STORAGE_STATE);if(currentUser){cloudProgress.saved_state=null;queueCloudSave()}}
+function scopedStorageKey(base){return currentUser&&currentUser.id?`${base}_${currentUser.id}`:base}
+function localHistory(){try{return JSON.parse(localStorage.getItem(scopedStorageKey(STORAGE_HISTORY))||'[]')}catch(e){return []}}
+function localSavedState(){try{return JSON.parse(localStorage.getItem(scopedStorageKey(STORAGE_STATE))||'null')}catch(e){return null}}
+function getTestCategory(t){return String((t&&t.category)||'general').trim()||'general'}
+function categoryLabel(cat){cat=String(cat||'general');if(cat==='general')return 'General';if(cat==='contratos')return 'Contratos';return cat.replace(/[-_]+/g,' ').replace(/\b\w/g,m=>m.toUpperCase())}
+function getTestKeyFromTest(t){return `${getTestCategory(t)}::${String(t&&t.id)}`}
+function getStateTestKey(s){return s&&s.testKey?String(s.testKey):`${String((s&&s.category)||'general')}::${String(s&&s.testId)}`}
+function findTestForHistory(x){return TESTS.find(t=>getTestKeyFromTest(t)===x.testKey)||TESTS.find(t=>Number(t.id)===Number(x.testId)&&(!x.category||getTestCategory(t)===x.category))||TESTS.find(t=>Number(t.id)===Number(x.testId))||null}
+function normalizeHistoryItem(x){const t=findTestForHistory(x||{})||null;const category=String((x&&x.category)||(t&&getTestCategory(t))||'general');const testId=(x&&x.testId)!==undefined?x.testId:(t&&t.id);return {...(x||{}),testId,category,categoryLabel:categoryLabel(category),testKey:(x&&x.testKey)||(t?getTestKeyFromTest(t):`${category}::${String(testId)}`),testTitle:(x&&x.testTitle)||(x&&x.title)||(t&&t.title)||'Test',source:(x&&x.source)||(t&&t.source)||''}}
+function normalizeHistoryList(list){return Array.isArray(list)?list.map(normalizeHistoryItem):[]}
+function historyAll(){return normalizeHistoryList(currentUser?(Array.isArray(cloudProgress.history)?cloudProgress.history:[]):localHistory())}
+function saveHistory(list){const clean=normalizeHistoryList(list);localStorage.setItem(scopedStorageKey(STORAGE_HISTORY),JSON.stringify(clean));if(currentUser){cloudProgress.history=clean;queueCloudSave()}}
+function savedStateIsContainer(raw){return raw&&typeof raw==='object'&&raw.__savedStatesByTestV2===true&&raw.byTest&&typeof raw.byTest==='object'}
+function savedStateContainer(raw){if(savedStateIsContainer(raw))return {__savedStatesByTestV2:true,activeKey:raw.activeKey||null,byTest:{...raw.byTest}};const byTest={};let activeKey=null;if(raw&&typeof raw==='object'&&raw.testId!==undefined){activeKey=getStateTestKey(raw);byTest[activeKey]=raw}return {__savedStatesByTestV2:true,activeKey,byTest}}
+function rawSavedStates(){return currentUser?cloudProgress.saved_state:localSavedState()}
+function selectedTestKey(){const t=getSelectedTest();return t?getTestKeyFromTest(t):null}
+function getSavedState(){const container=savedStateContainer(rawSavedStates());const key=selectedTestKey()||container.activeKey;return key?(container.byTest[key]||null):null}
+function persistSavedState(obj,keyOverride=null){const storageKey=scopedStorageKey(STORAGE_STATE);const container=savedStateContainer(rawSavedStates());const key=keyOverride||(obj?getStateTestKey(obj):selectedTestKey()||container.activeKey);if(obj){container.byTest[key]=obj;container.activeKey=key}else if(key){delete container.byTest[key];if(container.activeKey===key)container.activeKey=Object.keys(container.byTest)[0]||null}const value=Object.keys(container.byTest).length?container:null;if(value)localStorage.setItem(storageKey,JSON.stringify(value));else localStorage.removeItem(storageKey);if(currentUser){cloudProgress.saved_state=value;queueCloudSave()}}
+function clearSavedState(keyOverride=null){persistSavedState(null,keyOverride||(state?getStateTestKey(state):selectedTestKey()))}
+function historyMatchesTest(x,t){const key=getTestKeyFromTest(t);if(x.testKey)return x.testKey===key;return Number(x.testId)===Number(t.id)&&(!x.category||x.category===getTestCategory(t))}
 function queueCloudSave(){if(!currentUser||!supabaseClient)return;setSyncStatus('saving');clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(saveCloudProgress,900)}
 async function flushCloudSave(){clearTimeout(cloudSaveTimer);if(currentUser&&supabaseClient)await saveCloudProgress()}
-async function saveCloudProgress(){if(!currentUser||!supabaseClient)return;try{setSyncStatus('saving');const payload={user_id:currentUser.id,history:cloudProgress.history||[],saved_state:cloudProgress.saved_state||null,updated_at:new Date().toISOString()};const {error}=await supabaseClient.from(SUPABASE_TABLE).upsert(payload,{onConflict:'user_id'});if(error)throw error;setSyncStatus('ok')}catch(e){console.error(e);setSyncStatus('error');toast('No se pudo sincronizar con Supabase. Se mantiene copia local.')}}
-async function loadCloudProgress(){if(!currentUser||!supabaseClient)return;const {data,error}=await supabaseClient.from(SUPABASE_TABLE).select('history,saved_state,updated_at').eq('user_id',currentUser.id).maybeSingle();if(error){console.error(error);throw error}if(!data){cloudProgress={history:localHistory(),saved_state:localSavedState(),updated_at:null};await saveCloudProgress();return}cloudProgress={history:Array.isArray(data.history)?data.history:[],saved_state:data.saved_state||null,updated_at:data.updated_at||null};const lh=localHistory(),ls=localSavedState();if((!cloudProgress.history||cloudProgress.history.length===0)&&lh.length){cloudProgress.history=lh;if(!cloudProgress.saved_state&&ls)cloudProgress.saved_state=ls;await saveCloudProgress()}localStorage.setItem(STORAGE_HISTORY,JSON.stringify(cloudProgress.history));if(cloudProgress.saved_state)localStorage.setItem(STORAGE_STATE,JSON.stringify(cloudProgress.saved_state));else localStorage.removeItem(STORAGE_STATE)}
+async function saveCloudProgress(){if(!currentUser||!supabaseClient)return;try{setSyncStatus('saving');const payload={user_id:currentUser.id,history:cloudProgress.history||[],saved_state:cloudProgress.saved_state||null,updated_at:new Date().toISOString()};const {error}=await supabaseClient.from(SUPABASE_TABLE).upsert(payload,{onConflict:'user_id'});if(error)throw error;localStorage.setItem(scopedStorageKey(STORAGE_HISTORY),JSON.stringify(payload.history));if(payload.saved_state)localStorage.setItem(scopedStorageKey(STORAGE_STATE),JSON.stringify(payload.saved_state));else localStorage.removeItem(scopedStorageKey(STORAGE_STATE));setSyncStatus('ok')}catch(e){console.error(e);setSyncStatus('error');toast('No se pudo sincronizar con Supabase. Se mantiene copia local de este usuario.')}}
+async function loadCloudProgress(){if(!currentUser||!supabaseClient)return;const {data,error}=await supabaseClient.from(SUPABASE_TABLE).select('history,saved_state,updated_at').eq('user_id',currentUser.id).maybeSingle();if(error){console.error(error);throw error}if(!data){cloudProgress={history:[],saved_state:null,updated_at:null};await saveCloudProgress();return}cloudProgress={history:Array.isArray(data.history)?data.history:[],saved_state:data.saved_state||null,updated_at:data.updated_at||null};localStorage.setItem(scopedStorageKey(STORAGE_HISTORY),JSON.stringify(cloudProgress.history));if(cloudProgress.saved_state)localStorage.setItem(scopedStorageKey(STORAGE_STATE),JSON.stringify(cloudProgress.saved_state));else localStorage.removeItem(scopedStorageKey(STORAGE_STATE))}
 function showLogin(){clearInterval(timerInterval);state=null;$('authScreen').classList.remove('hidden');$('startScreen').classList.add('hidden');$('quizScreen').classList.add('hidden');$('resultScreen').classList.add('hidden')}
 function showApp(){if($('userEmailLabel'))$('userEmailLabel').textContent=currentUser?.email||'Sesión iniciada';$('authScreen').classList.add('hidden');$('startScreen').classList.remove('hidden');$('quizScreen').classList.add('hidden');$('resultScreen').classList.add('hidden');fillSelect();updateStartStats();setSyncStatus('ok')}
 async function initAuth(){if(!supabaseConfigured()||!window.supabase){showLogin();setAuthMessage('Antes de entrar, pega tus claves en el HTML: <b>SUPABASE_URL</b> y <b>SUPABASE_ANON_KEY</b>. Después crea la tabla con el SQL que te paso.', 'error');return}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const {data,error}=await supabaseClient.auth.getSession();if(error)console.error(error);if(data&&data.session&&data.session.user){currentUser=data.session.user;try{await loadCloudProgress();showApp();toast('Progreso sincronizado.')}catch(e){showLogin();setAuthMessage('No se pudo cargar tu progreso. Revisa que la tabla y las políticas RLS estén creadas.', 'error')}}else{showLogin();setAuthMessage('Introduce tu email y contraseña de Supabase. Si aún no tienes usuario, créalo desde Supabase > Authentication > Users.', '')}}
 async function loginWithSupabase(){if(!supabaseClient){setAuthMessage('Primero configura SUPABASE_URL y SUPABASE_ANON_KEY en el HTML.', 'error');return}const email=($('loginEmail').value||'').trim();const password=$('loginPassword').value||'';if(!email||!password){setAuthMessage('Rellena email y contraseña.', 'error');return}const btn=$('loginBtn');btn.disabled=true;btn.textContent='Entrando...';try{const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});if(error)throw error;currentUser=data.user;await loadCloudProgress();showApp();toast('Sesión iniciada y progreso sincronizado.')}catch(e){console.error(e);setAuthMessage('Usuario o contraseña incorrectos, o Supabase no está bien configurado.', 'error')}finally{btn.disabled=false;btn.textContent='Entrar'}}
 async function logoutSupabase(){await flushCloudSave();if(supabaseClient)await supabaseClient.auth.signOut();currentUser=null;cloudProgress={history:[],saved_state:null,updated_at:null};showLogin();setAuthMessage('Sesión cerrada.', 'ok')}
 function getSection(){return $('sectionSelect')?$('sectionSelect').value:'general'}
-function availableTests(){const sec=getSection();return sec==='all'?TESTS:TESTS.filter(t=>(t.category||'general')===sec)}
-function getSelectedTest(){const list=availableTests();return list.find(t=>t.id===Number($('testSelect').value))||list[0]||TESTS[0]}
-function fillSelect(){const list=availableTests();$('testSelect').innerHTML=list.map(t=>`<option value="${t.id}">${t.title}</option>`).join('');updateStartStats()}
+function ensureSectionOptions(){const sel=$('sectionSelect');if(!sel)return;const current=sel.value||'general';const cats=[...new Set(TESTS.map(getTestCategory))];sel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(categoryLabel(c))}</option>`).join('')+'<option value="all">Todos</option>';sel.value=(current==='all'||cats.includes(current))?current:(cats[0]||'all')}
+function availableTests(){const sec=getSection();return sec==='all'?TESTS:TESTS.filter(t=>getTestCategory(t)===sec)}
+function getSelectedTest(){const list=availableTests();const val=$('testSelect')?$('testSelect').value:'';return list.find(t=>getTestKeyFromTest(t)===val)||list.find(t=>String(t.id)===val)||list[0]||TESTS[0]}
+function fillSelect(){ensureSectionOptions();const list=availableTests();$('testSelect').innerHTML=list.map(t=>`<option value="${esc(getTestKeyFromTest(t))}">${esc(t.title)}</option>`).join('');updateStartStats()}
 function hasSavedAttempt(){return !!getSavedState()}
 function updateResumeButton(){const btn=$('resumeBtn');const wrap=document.querySelector('.main-start-actions');if(!btn||!wrap)return;const show=hasSavedAttempt();btn.classList.toggle('hidden',!show);wrap.classList.toggle('no-resume',!show)}
 function testModeLabel(t){const qs=t.questions||[];if(qs.some(q=>q.type==='written'))return 'Respuesta escrita';if(qs.length&&qs.every(q=>(q.options||[]).length===2&&(q.options||[]).some(o=>/verdadero/i.test(o.text))&&(q.options||[]).some(o=>/falso/i.test(o.text))))return 'Verdadero / Falso';return 'Tipo test'}
-function updateStartStats(){const t=getSelectedTest();if(!t)return;const all=historyAll();const h=all.map((x,i)=>({...x,_historyIndex:i})).filter(x=>x.testId===t.id);if($('selectedAttemptCount'))$('selectedAttemptCount').textContent=h.length;const historyEl=$('historyList');if(historyEl){historyEl.innerHTML=h.length?h.slice().reverse().map(x=>`<div class="history-item"><div class="history-content"><b>${fmtDate(x.date)}</b><br>Fallos: <b>${x.wrong}</b> · Correctas: ${x.correct} · Sin responder: ${x.unanswered}</div><button class="trash-btn" title="Borrar este intento" aria-label="Borrar este intento" data-history-index="${x._historyIndex}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg></button></div>`).join(''):'<div class="empty">Aún no hay intentos guardados de este test.</div>';}updateResumeButton()}
+function updateStartStats(){const t=getSelectedTest();if(!t)return;const all=historyAll();const h=all.map((x,i)=>({...x,_historyIndex:i})).filter(x=>historyMatchesTest(x,t));if($('selectedAttemptCount'))$('selectedAttemptCount').textContent=h.length;const historyEl=$('historyList');if(historyEl){historyEl.innerHTML=h.length?h.slice().reverse().map(x=>`<div class="history-item"><div class="history-content"><b>${fmtDate(x.date)}</b><br><span>${esc(x.categoryLabel||categoryLabel(x.category))} · ${esc(x.testTitle||x.title||t.title)}</span><br>Fallos: <b>${x.wrong}</b> · Correctas: ${x.correct} · Sin responder: ${x.unanswered}</div><button class="trash-btn" title="Borrar este intento" aria-label="Borrar este intento" data-history-index="${x._historyIndex}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg></button></div>`).join(''):'<div class="empty">Aún no hay intentos guardados de este test.</div>';}updateResumeButton()}
 function toggleInfoPanel(){const p=$('testInfoPanel');const b=$('toggleInfoBtn');if(!p||!b)return;const show=p.classList.contains('hidden');p.classList.toggle('hidden',!show);b.classList.toggle('active',show);b.title=show?'Ocultar historial del test':'Ver historial del test';b.setAttribute('aria-label',b.title)}
 function getQuestions(test){return [...test.questions]}
-function startFullTest(){const t=getSelectedTest();startQuiz(t.id,t.title,getQuestions(t),'full',t.duration||3600)}
-function startQuiz(testId,title,questions,mode,duration=3600){state={testId,title,mode,questions,current:0,answers:questions.map(()=>[]),flagged:questions.map(()=>false),checked:questions.map(()=>false),writtenAnswers:questions.map(()=>""),startedAt:Date.now(),duration:duration,remaining:duration,timeExpired:false,lastResult:null};persistSavedState(state);$('startScreen').classList.add('hidden');$('resultScreen').classList.add('hidden');$('quizScreen').classList.remove('hidden');buildPalette();renderQuestion();startTimer();window.scrollTo(0,0)}
+function startFullTest(){const t=getSelectedTest();startQuiz(t.id,t.title,getQuestions(t),'full',t.duration||3600,t)}
+function startQuiz(testId,title,questions,mode,duration=3600,testMeta=null){const meta=testMeta||TESTS.find(t=>Number(t.id)===Number(testId)&&t.title===title)||TESTS.find(t=>Number(t.id)===Number(testId))||{id:testId,title,category:'general',source:''};const category=getTestCategory(meta);state={testId,title,testTitle:title,testKey:getTestKeyFromTest(meta),category,categoryLabel:categoryLabel(category),source:meta.source||'',mode,questions,current:0,answers:questions.map(()=>[]),flagged:questions.map(()=>false),checked:questions.map(()=>false),writtenAnswers:questions.map(()=>""),startedAt:Date.now(),duration:duration,remaining:duration,timeExpired:false,lastResult:null};persistSavedState(state);$('startScreen').classList.add('hidden');$('resultScreen').classList.add('hidden');$('quizScreen').classList.remove('hidden');buildPalette();renderQuestion();startTimer();window.scrollTo(0,0)}
 function restoreQuiz(){const saved=getSavedState();if(!saved)return toast('No hay intento guardado.');try{state=typeof saved==='string'?JSON.parse(saved):saved}catch(e){return toast('No se pudo recuperar el intento.')}$('startScreen').classList.add('hidden');$('resultScreen').classList.add('hidden');$('quizScreen').classList.remove('hidden');buildPalette();renderQuestion();startTimer();toast('Intento recuperado.')}
 function saveState(){if(state)persistSavedState(state)}
 function startTimer(){clearInterval(timerInterval);updateTopbar();timerInterval=setInterval(()=>{if(!state)return;if(state.remaining>0){state.remaining--;if(state.remaining===0){state.timeExpired=true;toast('Tiempo agotado. Puedes seguir respondiendo y finalizar cuando quieras.')}}updateTopbar();if(state.remaining%10===0)saveState()},1000)}
@@ -489,9 +568,9 @@ function answerText(q,letters){if(q.type==='written'){const i=state.questions.in
 function isCorrect(i){const q=state.questions[i];if(q.type==='written'){return (state.answers[i]||[])[0]==='A'}const ans=[...(state.answers[i]||[])].sort(),cor=[...(q.correct||[])].sort();return cor.length>0&&ans.length===cor.length&&ans.every((x,j)=>x===cor[j])}
 function showCheckBox(){ensureWritten();const i=state.current,q=state.questions[i],ans=state.answers[i]||[],good=isCorrect(i);$('answerBox').className='answer-box '+(good?'good':'bad');if(q.type==='written'){$('answerBox').innerHTML=`<h3>Solución</h3>${state.writtenAnswers[i]?`<p><b>Tu respuesta:</b> ${esc(state.writtenAnswers[i])}</p>`:''}<p><b>Solución esperada:</b> ${esc(q.solution||q.explanation||answerText(q,q.correct))}</p><p><b>Autoevaluación:</b> ${esc(answerText(q,ans))}</p>`;$('answerBox').classList.remove('hidden');return}$('answerBox').innerHTML=`<h3>${good?'Correcta':'Incorrecta'}</h3><p><b>Tu respuesta:</b> ${esc(answerText(q,ans))}</p><p><b>Respuesta correcta:</b> ${esc(answerText(q,q.correct))}</p>${q.explanation?`<p><b>Explicación:</b> ${esc(q.explanation)}</p>`:''}${q.correct.length?'':'<p><b>Aviso:</b> no se pudo detectar la respuesta correcta en el PDF para esta pregunta.</p>'}`;$('answerBox').classList.remove('hidden');q.options.forEach(o=>{const el=document.querySelector(`.option[data-letter="${o.letter}"]`);if(!el)return;if(q.correct.includes(o.letter))el.classList.add('correct');if(ans.includes(o.letter)&&!q.correct.includes(o.letter))el.classList.add('wrong')})}
 function checkCurrent(){state.checked[state.current]=true;saveState();renderQuestion()}
-function finishQuiz(){if(!state)return;clearInterval(timerInterval);const total=state.questions.length;const correct=state.questions.filter((_,i)=>isCorrect(i)).length;const unanswered=state.questions.filter((q,i)=>q.type==='written'?!(state.writtenAnswers&&state.writtenAnswers[i])&&!(state.answers[i]&&state.answers[i].length):!(state.answers[i]&&state.answers[i].length)).length;const wrong=total-correct;const pct=Math.round(correct*100/total);const used=fmtTime((state.duration||3600)-state.remaining);const result={date:Date.now(),testId:state.testId,mode:state.mode,total,correct,wrong,unanswered,pct,used};state.lastResult=result;const h=historyAll();h.push(result);saveHistory(h);clearSavedState();flushCloudSave();$('quizScreen').classList.add('hidden');$('resultScreen').classList.remove('hidden');$('scorePct').textContent=pct+'%';$('scoreCircle').style.setProperty('--deg',Math.round(pct*3.6)+'deg');$('resultSubtitle').textContent=`${state.title} · ${result.mode==='wrong'?'Repetición de falladas':'Test completo'} · ${fmtDate(result.date)}`;$('scoreText').textContent=`Has tenido ${wrong} fallos de ${total} preguntas. Correctas: ${correct}. Sin responder: ${unanswered}. Tiempo usado: ${used}.`;$('breakdown').innerHTML=`<div class="stat"><b>${correct}</b><span>Correctas</span></div><div class="stat"><b>${wrong}</b><span>Fallos</span></div><div class="stat"><b>${unanswered}</b><span>Sin responder</span></div><div class="stat"><b>${used}</b><span>Tiempo usado</span></div>`;renderReview(false);window.scrollTo({top:0,behavior:'smooth'})}
+function finishQuiz(){if(!state)return;clearInterval(timerInterval);const total=state.questions.length;const correct=state.questions.filter((_,i)=>isCorrect(i)).length;const unanswered=state.questions.filter((q,i)=>q.type==='written'?!(state.writtenAnswers&&state.writtenAnswers[i])&&!(state.answers[i]&&state.answers[i].length):!(state.answers[i]&&state.answers[i].length)).length;const wrong=total-correct;const pct=Math.round(correct*100/total);const used=fmtTime((state.duration||3600)-state.remaining);const result={date:Date.now(),testId:state.testId,testKey:state.testKey,category:state.category||'general',categoryLabel:state.categoryLabel||categoryLabel(state.category),testTitle:state.testTitle||state.title,source:state.source||'',mode:state.mode,total,correct,wrong,unanswered,pct,used,startedAt:state.startedAt,finishedAt:Date.now(),questionsSnapshot:state.questions.map((q,i)=>({id:q.id,num:q.num,page:q.page,type:q.type||'test',question:q.question,correct:q.correct||[],answer:state.answers[i]||[],ok:isCorrect(i)}))};state.lastResult=result;const h=historyAll();h.push(result);saveHistory(h);clearSavedState(state.testKey);flushCloudSave();$('quizScreen').classList.add('hidden');$('resultScreen').classList.remove('hidden');$('scorePct').textContent=pct+'%';$('scoreCircle').style.setProperty('--deg',Math.round(pct*3.6)+'deg');$('resultSubtitle').textContent=`${state.title} · ${result.mode==='wrong'?'Repetición de falladas':'Test completo'} · ${fmtDate(result.date)}`;$('scoreText').textContent=`Has tenido ${wrong} fallos de ${total} preguntas. Correctas: ${correct}. Sin responder: ${unanswered}. Tiempo usado: ${used}.`;$('breakdown').innerHTML=`<div class="stat"><b>${correct}</b><span>Correctas</span></div><div class="stat"><b>${wrong}</b><span>Fallos</span></div><div class="stat"><b>${unanswered}</b><span>Sin responder</span></div><div class="stat"><b>${used}</b><span>Tiempo usado</span></div>`;renderReview(false);window.scrollTo({top:0,behavior:'smooth'})}
 function renderReview(onlyWrong){if(!state)return;ensureWritten();const items=[];state.questions.forEach((q,i)=>{if(!onlyWrong||!isCorrect(i))items.push([q,i])});$('reviewList').innerHTML=items.length?items.map(([q,i])=>{if(q.type==='written'){return `<div class="review-item"><h4>Pregunta ${i+1} · Nº ${q.num}</h4>${q.caseText?`<div class="case-box"><b>Enunciado del supuesto:</b><br>${escBr(q.caseText)}</div>`:''}<p>${esc(q.question)}</p>${state.writtenAnswers[i]?`<p><b>Tu respuesta:</b> ${esc(state.writtenAnswers[i])}</p>`:''}<p><b>Solución:</b> ${esc(q.solution||q.explanation||'')}</p><p><b>Autoevaluación:</b> ${esc(answerText(q,state.answers[i]||[]))}</p></div>`}return `<div class="review-item"><h4>Pregunta ${i+1} · Nº ${q.num}</h4>${q.caseText?`<div class="case-box"><b>Enunciado del supuesto:</b><br>${escBr(q.caseText)}</div>`:''}<p>${esc(q.question)}</p>${q.options.map(o=>`<div class="review-option ${q.correct.includes(o.letter)?'correct':''} ${(state.answers[i]||[]).includes(o.letter)&&!q.correct.includes(o.letter)?'user-wrong':''}"><b>${o.letter})</b> ${esc(o.text)} ${q.correct.includes(o.letter)?'✓':''} ${(state.answers[i]||[]).includes(o.letter)?' · tu respuesta':''}</div>`).join('')}<p><b>Respuesta correcta:</b> ${esc(answerText(q,q.correct))}</p>${q.explanation?`<p><b>Explicación:</b> ${esc(q.explanation)}</p>`:''}</div>`}).join(''):'<div class="empty">No hay fallos que revisar.</div>'}
-function repeatWrong(){if(!state||!state.lastResult)return toast('No hay resultado disponible.');const wrong=state.questions.filter((_,i)=>!isCorrect(i));if(!wrong.length)return toast('No tienes fallos para repetir.');startQuiz(state.testId,state.title,wrong,'wrong',state.duration||3600);toast('Test creado solo con las preguntas falladas.')}
+function repeatWrong(){if(!state||!state.lastResult)return toast('No hay resultado disponible.');const wrong=state.questions.filter((_,i)=>!isCorrect(i));if(!wrong.length)return toast('No tienes fallos para repetir.');startQuiz(state.testId,state.title,wrong,'wrong',state.duration||3600,{id:state.testId,title:state.title,category:state.category||'general',source:state.source||''});toast('Test creado solo con las preguntas falladas.')}
 function exportProgress(){
   const data={
     app:'simulador-tests-general-contratos',
@@ -499,9 +578,10 @@ function exportProgress(){
     exportedAt:new Date().toISOString(),
     storageKeys:{history:STORAGE_HISTORY,state:STORAGE_STATE},
     history:historyAll(),
-    savedState:null
+    savedState:null,
+    savedStates:null
   };
-  try{data.savedState=getSavedState()}catch(e){data.savedState=null}
+  try{data.savedState=getSavedState();data.savedStates=rawSavedStates()}catch(e){data.savedState=null;data.savedStates=null}
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
@@ -533,9 +613,13 @@ function importProgressFromFile(file){
         current.sort((a,b)=>(a.date||0)-(b.date||0));
         saveHistory(current);
       }
-      if(data.savedState){
-        const keepState=confirm('El JSON también contiene un intento guardado. ¿Quieres importarlo para poder continuarlo?');
-        if(keepState)persistSavedState(data.savedState);
+      const importedStates=data.savedStates||data.savedState;
+      if(importedStates){
+        const keepState=confirm('El JSON también contiene intentos guardados. ¿Quieres importarlos para poder continuarlos?');
+        if(keepState){
+          if(savedStateIsContainer(importedStates)){Object.values(importedStates.byTest||{}).forEach(st=>persistSavedState(st));}
+          else persistSavedState(importedStates);
+        }
       }
       updateStartStats();
       toast('Progreso importado correctamente.');
